@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SkillMatch - Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f5;
+            color: #202b23;
+            margin: 0;
+            padding: 40px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #245c35;
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        input[type="file"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            margin-top: 20px;
+            padding: 12px 20px;
+            background: #245c35;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #2e7344;
+        }
+        #results {
+            margin-top: 25px;
+            padding: 15px;
+            background: #f0f4f1;
+            border-radius: 8px;
+            display: none;
+        }
+        .skill-tag {
+            display: inline-block;
+            padding: 5px 12px;
+            margin: 4px;
+            border-radius: 15px;
+            font-size: 14px;
+        }
+        .matched {
+            background: #d4edda;
+            color: #245c35;
+        }
+        .missing {
+            background: #f8d7da;
+            color: #a33636;
+        }
+        #error {
+            color: #a33636;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Resume × Job Matching</h2>
+        <p>Upload your resume and paste a job description to see how well you match.</p>
+
+        <label>Resume (PDF)</label>
+        <input type="file" id="resumeFile" accept="application/pdf">
+
+        <label>Job Description</label>
+        <textarea id="jobDescription" placeholder="Paste the job description here..."></textarea>
+
+        <button onclick="analyzeResume()">Analyze Resume</button>
+        <div id="error"></div>
+
+        <div id="results">
+            <h3>Match Score: <span id="matchScore"></span>%</h3>
+            <p><strong>Matched Skills:</strong></p>
+            <div id="matchedSkills"></div>
+            <p><strong>Missing Skills:</strong></p>
+            <div id="missingSkills"></div>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeResume() {
+            const fileInput = document.getElementById("resumeFile");
+            const jobDescription = document.getElementById("jobDescription").value;
+            const errorDiv = document.getElementById("error");
+            const resultsDiv = document.getElementById("results");
+
+            errorDiv.textContent = "";
+            resultsDiv.style.display = "none";
+
+            if (!fileInput.files[0]) {
+                errorDiv.textContent = "Please select a resume PDF.";
+                return;
+            }
+            if (!jobDescription.trim()) {
+                errorDiv.textContent = "Please paste a job description.";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+            formData.append("job_description", jobDescription);
+
+            try {
+                const response = await fetch("http://127.0.0.1:8000/analyze-resume", {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    errorDiv.textContent = data.detail || "Something went wrong. Are you logged in?";
+                    return;
+                }
+
+                document.getElementById("matchScore").textContent = data.match_percentage;
+
+                const matchedDiv = document.getElementById("matchedSkills");
+                matchedDiv.innerHTML = "";
+                if (data.matched_skills.length === 0) {
+                    matchedDiv.innerHTML = "<em>None found</em>";
+                } else {
+                    data.matched_skills.forEach(skill => {
+                        matchedDiv.innerHTML += `<span class="skill-tag matched">${skill}</span>`;
+                    });
+                }
+
+                const missingDiv = document.getElementById("missingSkills");
+                missingDiv.innerHTML = "";
+                if (data.missing_skills.length === 0) {
+                    missingDiv.innerHTML = "<em>None — great match!</em>";
+                } else {
+                    data.missing_skills.forEach(skill => {
+                        missingDiv.innerHTML += `<span class="skill-tag missing">${skill}</span>`;
+                    });
+                }
+
+                resultsDiv.style.display = "block";
+
+            } catch (err) {
+                errorDiv.textContent = "Could not reach server. Is FastAPI running?";
+            }
+        }
+    </script>
+</body>
+</html>
